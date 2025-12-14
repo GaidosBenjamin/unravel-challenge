@@ -1,0 +1,106 @@
+services:
+
+  unravel-spring-app:
+    build:
+      context: .
+    container_name: unravel-spring-app
+    ports:
+      - "8080:8080"
+      - "9010:9010" # JMX port
+      - "9011:9011" # JMX rmi port
+    env_file:
+      - ./docker-env.env
+    working_dir: /app
+    command:
+    - java
+    - -Dcom.sun.management.jmxremote
+    - -Dcom.sun.management.jmxremote.port=9010
+    - -Dcom.sun.management.jmxremote.rmi.port=9011
+    - -Djava.rmi.server.hostname=0.0.0.0
+    - -Dcom.sun.management.jmxremote.ssl=false
+    - -Dcom.sun.management.jmxremote.authenticate=false
+    - -jar
+    - app.jar
+    depends_on:
+      unravel-redis:
+        condition: service_started
+      unravel-mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 15s
+      timeout: 1s
+      retries: 3
+      start_period: 2s
+
+  unravel-redis:
+    image: redis:7-alpine
+    container_name: unravel-redis
+    command:
+      - redis-server
+      - --maxmemory
+      - 1024mb # Set max memory to 1GB
+      - --maxmemory-policy
+      - allkeys-lru # Eviction policy to remove least recently used keys
+    ports:
+      - "6379:6379" # Expose Redis port, if needed
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  unravel-mysql:
+    image: mysql:9.5.0
+    container_name: unravel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: unravel-db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD" ]
+      interval: 15s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+  unravel-prometheus:
+    image: prom/prometheus:latest
+    container_name: unravel-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      unravel-spring-app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  unravel-grafana:
+    image: grafana/grafana:latest
+    container_name: unravel-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      unravel-prometheus:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  prometheus_data:
+  mysql_data:
+  grafana_data:

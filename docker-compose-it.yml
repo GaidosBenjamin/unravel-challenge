@@ -1,0 +1,29 @@
+services:
+
+  it-redis:
+    image: redis:7-alpine
+    container_name: it-redis
+    ports:
+      - "6379:6379"
+    command:
+      - redis-server
+      - --maxmemory
+      - 32mb # Set max memory
+      - --maxmemory-policy
+      - allkeys-lru # Eviction policy to remove least recently used keys
+
+  integration-tests:
+    image: maven:3.9.6-eclipse-temurin-21 #mvn with JDK 21
+    container_name: unravel-integration-tests
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command:
+      - ./mvnw
+      - verify
+    depends_on:
+      it-redis:
+        condition: service_started
+    environment:
+      REDIS_HOST: it-redis
+      REDIS_PORT: 6379
