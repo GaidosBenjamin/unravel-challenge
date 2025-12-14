@@ -26,6 +26,7 @@
     <java.version>21</java.version>
     <maven.compiler.release>21</maven.compiler.release>
     <lombok.version>1.18.42</lombok.version>
+    <openapi.version>3.0.0</openapi.version>
   </properties>
 
   <dependencies>
@@ -48,6 +49,11 @@
         <groupId>com.bgaidos</groupId>
         <artifactId>unravel-service</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${openapi.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
